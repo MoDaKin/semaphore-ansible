@@ -18,9 +18,6 @@
         apt list --upgradable 2>/dev/null | tail -n +2 | wc -l
       register: upgradable_count
       changed_when: false
-      failed_when: false
-      args:
-        warn: false
       tags:
         - apt
         - report
@@ -38,7 +35,3 @@
       tags:
         - apt
         - report
-        
-    - name: Debug raw output
-      ansible.builtin.debug:
-        var: upgradable_count
