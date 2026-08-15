@@ -1,0 +1,69 @@
+---
+- name: Check for new Docker Compose image versions
+  hosts: docker
+  gather_facts: no
+  ignore_unreachable: true
+  any_errors_fatal: false
+  tasks:
+    - name: Discover compose project directories
+      ansible.builtin.find:
+        paths: /docker
+        file_type: directory
+        recurse: no
+      register: docker_dirs
+
+    - name: Check each project for image updates
+      ansible.builtin.shell: |
+        cd {{ item.path }}
+        before=$(docker compose images 2>/dev/null | tail -n +2 | awk '{print $1, $4}')
+        docker compose pull -q >/dev/null 2>&1
+        after=$(docker compose images 2>/dev/null | tail -n +2 | awk '{print $1, $4}')
+        diff <(echo "$before") <(echo "$after") | grep '^>' | awk '{print $2}' | tr '\n' ',' | sed 's/,$//'
+      register: project_check
+      loop: "{{ docker_dirs.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      changed_when: false
+
+    - name: Set fact with update summary
+      ansible.builtin.set_fact:
+        docker_updates: >-
+          {{ project_check.results
+             | selectattr('stdout', 'ne', '')
+             | map(attribute='item.path')
+             | zip(project_check.results | selectattr('stdout', 'ne', '') | map(attribute='stdout'))
+             | list }}
+
+- name: Notify Discord about available image updates
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Build message content
+      ansible.builtin.set_fact:
+        discord_message: |
+          🔍 **Docker Image Update-Check**
+          {% for host in groups['docker'] %}
+          {% if hostvars[host].docker_updates is defined %}
+          {% if hostvars[host].docker_updates | length > 0 %}
+          **{{ host }}**:
+          {% for entry in hostvars[host].docker_updates %}
+          - {{ entry[0] }}: {{ entry[1] }}
+          {% endfor %}
+          {% else %}
+          **{{ host }}**: ✅ alles aktuell
+          {% endif %}
+          {% else %}
+          **{{ host }}**: ⛔ nicht erreichbar
+          {% endif %}
+          {% endfor %}
+
+    - name: Send Discord notification
+      ansible.builtin.uri:
+        url: "{{ webhook_url }}"
+        method: POST
+        body_format: json
+        body:
+          content: "{{ discord_message }}"
+        status_code: 204
+      check_mode: false
