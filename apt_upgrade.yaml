@@ -1,8 +1,49 @@
-- name: Update all packages to their latest version
-  ansible.builtin.apt:
-    name: "*"
-    state: latest
+---
+- name: Update packages and check reboot requirement
+  hosts: debian
+  become: yes
+  user: root
+  gather_facts: yes
+  tasks:
+    - name: Update APT cache
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 0
 
-- name: Remove dependencies that are no longer required and purge their configuration files
-  ansible.builtin.apt:
-    autoremove: yes
+    - name: Upgrade all packages
+      ansible.builtin.apt:
+        upgrade: dist
+      register: apt_upgrade_result
+
+    - name: Check if reboot is required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required_file
+
+    - name: Set fact for reboot requirement
+      ansible.builtin.set_fact:
+        needs_reboot: "{{ reboot_required_file.stat.exists }}"
+
+- name: Notify Discord about hosts needing reboot
+  hosts: localhost
+  gather_facts: no
+  vars:
+    discord_webhook_url: "https://discord.com/api/webhooks/{{ webhook_url }}"
+    reboot_hosts: >-
+      {{ groups['debian']
+         | select('in', ansible_play_hosts_all)
+         | map('extract', hostvars)
+         | selectattr('needs_reboot', 'defined')
+         | selectattr('needs_reboot')
+         | map(attribute='inventory_hostname')
+         | list }}
+  tasks:
+    - name: Send Discord notification if reboot needed
+      ansible.builtin.uri:
+        url: "{{ discord_webhook_url }}"
+        method: POST
+        body_format: json
+        body:
+          content: "🔄 **Neustart empfohlen** auf: {{ reboot_hosts | join(', ') }}"
+        status_code: 204
+      when: reboot_hosts | length > 0
