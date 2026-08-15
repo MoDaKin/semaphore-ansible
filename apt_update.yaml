@@ -5,7 +5,6 @@
   gather_facts: yes
   ignore_unreachable: true
   any_errors_fatal: false
-
   tasks:
     - name: Refresh APT package cache (idempotent)
       ansible.builtin.apt:
@@ -26,6 +25,7 @@
     - name: Persist numeric count as a fact
       ansible.builtin.set_fact:
         upgradable_packages_count: "{{ upgradable_count.stdout | default('0') | int }}"
+      when: upgradable_count is defined and upgradable_count.stdout is defined
       tags:
         - apt
         - report
@@ -33,6 +33,34 @@
     - name: Show upgradable package count for the host
       ansible.builtin.debug:
         msg: "Host {{ inventory_hostname }} has {{ upgradable_packages_count }} upgradable packages"
+      when: upgradable_packages_count is defined
       tags:
         - apt
         - report
+
+- name: Notify Discord about upgradable packages
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Build message content
+      ansible.builtin.set_fact:
+        discord_message: |
+          📦 **APT Update-Check**
+          {% for host in groups['debian'] %}
+          {% if hostvars[host].upgradable_packages_count is defined %}
+          **{{ host }}**: {{ hostvars[host].upgradable_packages_count }} Pakete verfügbar
+          {% else %}
+          **{{ host }}**: ⛔ nicht erreichbar
+          {% endif %}
+          {% endfor %}
+
+    - name: Send Discord notification
+      ansible.builtin.uri:
+        url: "{{ webhook_url }}"
+        method: POST
+        body_format: json
+        body:
+          content: "{{ discord_message }}"
+        status_code: 204
+      check_mode: false
