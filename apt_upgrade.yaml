@@ -32,19 +32,6 @@
   connection: local
   gather_facts: no
   vars:
-    reboot_lines: >-
-      {{ groups['debian']
-         | map('extract', hostvars)
-         | selectattr('needs_reboot', 'defined')
-         | selectattr('needs_reboot')
-         | map(attribute='inventory_hostname')
-         | list }}
-    summary_lines: >-
-      {{ groups['debian']
-         | map('extract', hostvars)
-         | map(attribute='inventory_hostname')
-         | zip(groups['debian'] | map('extract', hostvars) | map(attribute='updated_count', default=0))
-         | list }}
   tasks:
     - name: Build message content
       ansible.builtin.set_fact:
