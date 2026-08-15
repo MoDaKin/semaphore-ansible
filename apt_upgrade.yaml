@@ -20,30 +20,42 @@
         path: /var/run/reboot-required
       register: reboot_required_file
 
-    - name: Set fact for reboot requirement
+    - name: Set facts for reporting
       ansible.builtin.set_fact:
         needs_reboot: "{{ reboot_required_file.stat.exists }}"
+        updated_count: "{{ apt_upgrade_result.changes.installed | default([]) | length if apt_upgrade_result.changes is defined else 0 }}"
 
-- name: Notify Discord about hosts needing reboot
+- name: Notify Discord about update results
   hosts: localhost
   gather_facts: no
   vars:
-    discord_webhook_url: "https://discord.com/api/webhooks/{{ webhook_url }}"
-    reboot_hosts: >-
+    reboot_lines: >-
       {{ groups['debian']
-         | select('in', ansible_play_hosts_all)
          | map('extract', hostvars)
          | selectattr('needs_reboot', 'defined')
          | selectattr('needs_reboot')
          | map(attribute='inventory_hostname')
          | list }}
+    summary_lines: >-
+      {{ groups['debian']
+         | map('extract', hostvars)
+         | map(attribute='inventory_hostname')
+         | zip(groups['debian'] | map('extract', hostvars) | map(attribute='updated_count', default=0))
+         | list }}
   tasks:
-    - name: Send Discord notification if reboot needed
+    - name: Build message content
+      ansible.builtin.set_fact:
+        discord_message: |
+          📦 **Update-Report**
+          {% for host in groups['debian'] %}
+          **{{ host }}**: {{ hostvars[host].updated_count | default(0) }} Pakete aktualisiert{{ ' ⚠️ Neustart empfohlen' if hostvars[host].needs_reboot | default(false) else '' }}
+          {% endfor %}
+
+    - name: Send Discord notification
       ansible.builtin.uri:
-        url: "{{ discord_webhook_url }}"
+        url: "{{ webhook_url }}" #Variable in Variable Groupe in Semaphore einrichten und für den Task auswählen, damit keine Secrets im Playbook landen.
         method: POST
         body_format: json
         body:
-          content: "🔄 **Neustart empfohlen** auf: {{ reboot_hosts | join(', ') }}"
+          content: "{{ discord_message }}"
         status_code: 204
-      when: reboot_hosts | length > 0
