@@ -2,7 +2,6 @@
 - name: Update packages and check reboot requirement
   hosts: debian
   become: yes
-  user: root
   gather_facts: yes
   ignore_unreachable: true
   any_errors_fatal: false
