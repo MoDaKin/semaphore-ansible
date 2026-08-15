@@ -1,7 +1,7 @@
 ---
 - name: Update APT cache and report number of upgradable packages
   hosts: debian
-  user: root
+  become: yes
   gather_facts: yes
 
   tasks:
@@ -37,3 +37,7 @@
       tags:
         - apt
         - report
+        
+    - name: Debug raw output
+      ansible.builtin.debug:
+        var: upgradable_count
