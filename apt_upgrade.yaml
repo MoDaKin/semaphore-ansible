@@ -26,8 +26,8 @@
       ansible.builtin.set_fact:
         needs_reboot: "{{ reboot_required_file.stat.exists }}"
         updated_count: "{{ apt_upgrade_result.changes.installed | default([]) | length if apt_upgrade_result.changes is defined else 0 }}"
+      when: reboot_required_file is defined and reboot_required_file.stat is defined
     
-  when: reboot_required_file is defined and reboot_required_file.stat is defined
 - name: Notify Discord about update results
   hosts: localhost
   connection: local
