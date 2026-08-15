@@ -20,6 +20,7 @@
     - name: Set project directory list
       ansible.builtin.set_fact:
         docker_dirs: "{{ docker_dirs_raw.stdout_lines }}"
+      when: docker_dirs_raw is defined and docker_dirs_raw.stdout_lines is defined
 
     - name: Pull, recreate and detect changes per project
       ansible.builtin.shell: |
@@ -36,7 +37,7 @@
       loop_control:
         label: "{{ item }}"
       changed_when: false
-      when: docker_dirs | length > 0
+      when: docker_dirs is defined and docker_dirs | length > 0
 
     - name: Prune unused images
       ansible.builtin.shell: docker image prune -f
