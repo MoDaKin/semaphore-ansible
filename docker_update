@@ -1,0 +1,89 @@
+---
+- name: Update Docker Compose services
+  hosts: docker
+  gather_facts: no
+  ignore_unreachable: true
+  any_errors_fatal: false
+  tasks:
+    - name: Discover compose project directories
+      ansible.builtin.shell: |
+        for d in /docker/*/; do
+          if [ -f "${d}compose.yaml" ]; then
+            echo "${d%/}"
+          fi
+        done
+      args:
+        executable: /bin/bash
+      register: docker_dirs_raw
+      changed_when: false
+
+    - name: Set project directory list
+      ansible.builtin.set_fact:
+        docker_dirs: "{{ docker_dirs_raw.stdout_lines }}"
+
+    - name: Pull, recreate and detect changes per project
+      ansible.builtin.shell: |
+        cd {{ item }}
+        before=$(docker compose images 2>/dev/null | tail -n +2 | awk '{print $1, $4}')
+        docker compose pull -q
+        docker compose up -d
+        after=$(docker compose images 2>/dev/null | tail -n +2 | awk '{print $1, $4}')
+        diff <(echo "$before") <(echo "$after") | grep '^>' | awk '{print $2}' | tr '\n' ',' | sed 's/,$//'
+      args:
+        executable: /bin/bash
+      register: project_update
+      loop: "{{ docker_dirs }}"
+      loop_control:
+        label: "{{ item }}"
+      changed_when: false
+      when: docker_dirs | length > 0
+
+    - name: Prune unused images
+      ansible.builtin.shell: docker image prune -f
+      register: prune_result
+      changed_when: "'Total reclaimed space: 0B' not in prune_result.stdout"
+
+    - name: Set fact with update summary
+      ansible.builtin.set_fact:
+        docker_updated_services: >-
+          {{ project_update.results
+             | selectattr('stdout', 'ne', '')
+             | map(attribute='item')
+             | zip(project_update.results | selectattr('stdout', 'ne', '') | map(attribute='stdout'))
+             | list }}
+        prune_summary: "{{ prune_result.stdout_lines | last | default('n/a') }}"
+      when: project_update.results is defined
+
+- name: Notify Discord about applied updates
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Build message content
+      ansible.builtin.set_fact:
+        discord_message: |
+          🚀 **Docker Update-Report**
+          {% for host in groups['docker'] %}
+          {% if hostvars[host].docker_updated_services is defined %}
+          {% if hostvars[host].docker_updated_services | length > 0 %}
+          **{{ host }}** ({{ hostvars[host].prune_summary }}):
+          {% for entry in hostvars[host].docker_updated_services %}
+          - {{ entry[0] }}: {{ entry[1] }}
+          {% endfor %}
+          {% else %}
+          **{{ host }}**: ✅ keine Änderungen ({{ hostvars[host].prune_summary }})
+          {% endif %}
+          {% else %}
+          **{{ host }}**: ⛔ nicht erreichbar
+          {% endif %}
+          {% endfor %}
+
+    - name: Send Discord notification
+      ansible.builtin.uri:
+        url: "{{ webhook_url }}"
+        method: POST
+        body_format: json
+        body:
+          content: "{{ discord_message }}"
+        status_code: 204
+      check_mode: false
