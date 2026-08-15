@@ -27,6 +27,7 @@
 
 - name: Notify Discord about update results
   hosts: localhost
+  connection: local
   gather_facts: no
   vars:
     reboot_lines: >-
