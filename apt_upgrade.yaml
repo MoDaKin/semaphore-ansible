@@ -49,10 +49,14 @@
     - name: Build message content
       ansible.builtin.set_fact:
         discord_message: |
-          📦 **Update-Report**
-          {% for host in groups['debian'] %}
-          **{{ host }}**: {{ hostvars[host].updated_count | default(0) }} Pakete aktualisiert{{ ' ⚠️ Neustart empfohlen' if hostvars[host].needs_reboot | default(false) else '' }}
-          {% endfor %}
+        📦 **Update-Report**
+        {% for host in groups['debian'] %}
+        {% if hostvars[host].needs_reboot is defined %}
+        **{{ host }}**: {{ hostvars[host].updated_count | default(0) }} Pakete aktualisiert{{ ' ⚠️ Neustart empfohlen' if hostvars[host].needs_reboot else '' }}
+        {% else %}
+        **{{ host }}**: ⛔ nicht erreichbar
+        {% endif %}
+        {% endfor %}
 
     - name: Send Discord notification
       ansible.builtin.uri:
