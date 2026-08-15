@@ -1,8 +1,7 @@
-- name : Update Debian-Host Repo (apt-get update)
-  ansible.builtin.apt:
-    update_cache: yes
-
-- name: Only run "update_cache=yes" if the last one is more than 3600 seconds ago
-  ansible.builtin.apt:
-    update_cache: yes
-    cache_valid_time: 3600
+- name: Update the Repo if not updated since 3600 seconds 
+  hosts: debian
+  tasks:
+    - name: Only run "update_cache=yes" if the last one is more than 3600 seconds ago
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
