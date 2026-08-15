@@ -2,6 +2,7 @@
 - name: Update APT cache and report number of upgradable packages
   hosts: debian
   become: yes
+  user: root
   gather_facts: yes
 
   tasks:
