@@ -1,8 +1,43 @@
-- name: Update the Repo if not updated since 3600 seconds 
+---
+- name: Update APT cache and report number of upgradable packages
   hosts: debian
   user: root
+  gather_facts: yes
+  vars:
+    # Consider cache valid for 1 hour to avoid unnecessary updates when re-running
+    apt_cache_valid_time: 3600
+
   tasks:
-    - name: Only run "update_cache=yes" if the last one is more than 3600 seconds ago
+    - name: Refresh APT package cache (idempotent)
       ansible.builtin.apt:
         update_cache: yes
-        cache_valid_time: 3600
+        cache_valid_time: "{{ apt_cache_valid_time }}"
+      tags:
+        - apt
+        - refresh_cache
+
+    - name: Count upgradable APT packages
+      ansible.builtin.shell: >
+        apt list --upgradable 2>/dev/null | tail -n +2 | wc -l
+      register: upgradable_count
+      changed_when: false
+      failed_when: false
+      args:
+        warn: false
+      tags:
+        - apt
+        - report
+
+    - name: Persist numeric count as a fact
+      ansible.builtin.set_fact:
+        upgradable_packages_count: "{{ upgradable_count.stdout | default('0') | int }}"
+      tags:
+        - apt
+        - report
+
+    - name: Show upgradable package count for the host
+      ansible.builtin.debug:
+        msg: "Host {{ inventory_hostname }} has {{ upgradable_packages_count }} upgradable packages"
+      tags:
+        - apt
+        - report
