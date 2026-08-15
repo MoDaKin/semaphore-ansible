@@ -4,6 +4,8 @@
   become: yes
   user: root
   gather_facts: yes
+  ignore_unreachable: true
+  any_errors_fatal: false
 
   tasks:
     - name: Refresh APT package cache (idempotent)
