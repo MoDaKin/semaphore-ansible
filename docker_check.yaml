@@ -22,13 +22,12 @@
         docker_dirs: "{{ docker_dirs_raw.stdout_lines }}"
       when: docker_dirs_raw is defined and docker_dirs_raw.stdout_lines is defined
 
-    - name: Check each project for image updates
+    - name: Check each project for image updates (dry-run)
       ansible.builtin.shell: |
         cd {{ item }}
-        before=$(docker compose images 2>/dev/null | tail -n +2 | awk '{print $1, $4}')
-        docker compose pull -q >/dev/null 2>&1
-        after=$(docker compose images 2>/dev/null | tail -n +2 | awk '{print $1, $4}')
-        diff <(echo "$before") <(echo "$after") | grep '^>' | awk '{print $2}' | tr '\n' ',' | sed 's/,$//'
+        docker compose pull --dry-run --format json 2>/dev/null | \
+          jq -r '.Services[] | select(.Plan=="fetch") | .Name' | \
+          tr '\n' ',' | sed 's/,$//'
       args:
         executable: /bin/bash
       register: project_check
