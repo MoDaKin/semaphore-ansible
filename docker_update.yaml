@@ -7,7 +7,7 @@
   tasks:
     - name: Discover compose project directories
       ansible.builtin.shell: |
-        for d in /docker/*/; do
+        for d in /docker; do
           if [ -f "${d}compose.yaml" ]; then
             echo "${d%/}"
           fi
