@@ -5,7 +5,7 @@
   ignore_unreachable: true
   any_errors_fatal: false
   tasks:
-    - name: Remove "scopio" package
+    - name: Remove "skopeo" package
       ansible.builtin.apt:
-        name: scopio
+        name: skopeo
         state: absent
