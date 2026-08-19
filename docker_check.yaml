@@ -2,7 +2,7 @@
 - name: Update Docker Compose services
   hosts: docker_immich
   gather_facts: no
-  vars:
+  var:
     docker_dir: /docker
   tasks:
   
