@@ -1,8 +1,9 @@
 ---
 - name: Update Docker Compose services
   hosts: docker_immich
-  docker_dir: /docker
   gather_facts: no
+  var:
+    docker_dir: /docker
   tasks:
   
     - name: Pull images
