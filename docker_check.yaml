@@ -22,10 +22,9 @@
       ansible.builtin.debug:
         var: output_up
 
-    - name: Remove Images
-      community.docker.docker_image_remove:
-        project_src: /docker
-        prune: true
+    - name: Prune Image
+      community.docker.docker_prune:
+        images: true
       register: output_prune
 
     - name: Show results
