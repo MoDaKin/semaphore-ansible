@@ -6,6 +6,6 @@
   any_errors_fatal: false
   tasks:
     - name: Remove "scopio" package
-    ansible.builtin.apt:
-      name: scopio
-      state: absent
+      ansible.builtin.apt:
+        name: scopio
+        state: absent
