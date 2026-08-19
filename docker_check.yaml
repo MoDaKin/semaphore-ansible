@@ -7,7 +7,7 @@
   
     - name: Pull images
       community.docker.docker_compose_v2_pull:
-        project_src: {{docker_dir}}
+        project_src: {{ docker_dir }}
       register: output_pull
 
     - name: Show results
@@ -16,7 +16,7 @@
 
     - name: Run `docker compose up`
       community.docker.docker_compose_v2:
-        project_src: {{docker_dir}}
+        project_src: {{ docker_dir }}
       register: output_up
 
     - name: Show results
