@@ -1,11 +1,1 @@
----
-- name: Uninstall Package
-  hosts: all
-  gather_facts: no
-  ignore_unreachable: true
-  any_errors_fatal: false
-  tasks:
-    - name: Remove "skopeo" package
-      ansible.builtin.apt:
-        name: skopeo
-        state: absent
+
