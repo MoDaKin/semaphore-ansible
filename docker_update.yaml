@@ -1,6 +1,6 @@
 ---
 - name: Update Docker Compose services
-  hosts: docker
+  hosts: all
   gather_facts: no
  
   tasks:
