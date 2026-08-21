@@ -1,0 +1,60 @@
+---
+- name: Update Docker Compose services
+  hosts: all
+  gather_facts: no
+
+  tasks:
+
+    - name: Pull images
+      community.docker.docker_compose_v2_pull:
+        project_src: "{{ docker_dir }}"
+      register: output_pull
+
+    - name: Run `docker compose up`
+      community.docker.docker_compose_v2:
+        project_src: "{{ docker_dir }}"
+      register: output_up
+
+    - name: Prune Image
+      community.docker.docker_prune:
+        images: true
+      register: output_prune
+
+    - name: Aktualisierte Services ermitteln
+      set_fact:
+        changed_services: "{{ output_up.containers | default([]) | selectattr('changed', 'defined') | selectattr('changed') | map(attribute='name') | list }}"
+
+- name: Discord-Bericht senden
+  hosts: localhost
+  gather_facts: no
+  vars:
+    hosts_with_updates: "{{ groups['all'] | select('in', hostvars) | map('extract', hostvars, 'changed_services') | zip(groups['all']) | selectattr('0', 'defined') | rejectattr('0', 'equalto', []) | list }}"
+
+  tasks:
+
+    - name: Bericht pro aktualisiertem Host senden
+      uri:
+        url: "{{ hostvars[item].webhook_url | default(webhook_url) }}"
+        method: POST
+        body_format: json
+        body:
+          username: "Ansible Update Bot"
+          embeds:
+            - title: "Docker Update: {{ item }}"
+              color: 3066993
+              fields: "{{ hostvars[item].changed_services | map('community.general.dict_kv', 'name') | list }}"
+              description: "{{ hostvars[item].changed_services | join(', ') }}"
+        status_code: 204
+      loop: "{{ groups['all'] }}"
+      when: hostvars[item].changed_services | default([]) | length > 0
+
+    - name: "Meldung senden: keine Updates"
+      uri:
+        url: "{{ webhook_url }}"
+        method: POST
+        body_format: json
+        body:
+          username: "Ansible Update Bot"
+          content: "keine Docker-Updates"
+        status_code: 204
+      when: groups['all'] | map('extract', hostvars, 'changed_services') | select('defined') | map('length') | sum == 0
