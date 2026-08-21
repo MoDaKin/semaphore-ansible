@@ -4,7 +4,17 @@
   gather_facts: no
 
   tasks:
+  
+    - name: Connectivity check
+      ansible.builtin.wait_for_connection:
+        timeout: 5
+      ignore_unreachable: true
+      register: connection_test
 
+    - name: Nicht erreichbare Hosts überspringen
+      meta: end_host
+      when: connection_test is unreachable
+      
     - name: Pull images
       community.docker.docker_compose_v2_pull:
         project_src: "{{ docker_dir }}"
