@@ -2,9 +2,8 @@
 - name: Update Docker Compose services
   hosts: all
   gather_facts: no
-
   tasks:
-  
+
     - name: Connectivity check
       ansible.builtin.ping:
       ignore_unreachable: true
@@ -14,7 +13,7 @@
     - name: Nicht erreichbare Hosts überspringen
       meta: end_host
       when: connection_test is unreachable or connection_test is failed
-      
+
     - name: Pull images
       community.docker.docker_compose_v2_pull:
         project_src: "{{ docker_dir }}"
@@ -32,14 +31,15 @@
 
     - name: Aktualisierte Services ermitteln
       set_fact:
-        changed_services: "{{ output_up.containers | default([]) | selectattr('changed', 'defined') | selectattr('changed') | map(attribute='name') | list }}"
+        changed_services: "{{ output_up.actions | default([]) | selectattr('status', 'equalto', 'Recreate') | map(attribute='id') | unique | list }}"
+
+    - name: Sicherstellen, dass changed_services immer gesetzt ist
+      set_fact:
+        changed_services: "{{ changed_services | default([]) }}"
 
 - name: Discord-Bericht senden
   hosts: localhost
   gather_facts: no
-  vars:
-    hosts_with_updates: "{{ groups['all'] | select('in', hostvars) | map('extract', hostvars, 'changed_services') | zip(groups['all']) | selectattr('0', 'defined') | rejectattr('0', 'equalto', []) | list }}"
-
   tasks:
 
     - name: Bericht pro aktualisiertem Host senden
@@ -52,7 +52,6 @@
           embeds:
             - title: "Docker Update: {{ item }}"
               color: 3066993
-              fields: "{{ hostvars[item].changed_services | map('community.general.dict_kv', 'name') | list }}"
               description: "{{ hostvars[item].changed_services | join(', ') }}"
         status_code: 204
       loop: "{{ groups['all'] }}"
