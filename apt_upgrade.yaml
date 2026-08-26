@@ -11,6 +11,11 @@
         update_cache: yes
         cache_valid_time: 0
 
+    - name: Count upgradable APT packages before upgrade
+      ansible.builtin.shell: apt list --upgradable 2>/dev/null | tail -n +2 | wc -l
+      register: upgradable_before
+      changed_when: false
+
     - name: Upgrade all packages
       ansible.builtin.apt:
         upgrade: dist
@@ -24,14 +29,13 @@
     - name: Set facts for reporting
       ansible.builtin.set_fact:
         needs_reboot: "{{ reboot_required_file.stat.exists }}"
-        updated_count: "{{ apt_upgrade_result.changes.installed | default([]) | length if apt_upgrade_result.changes is defined else 0 }}"
+        updated_count: "{{ upgradable_before.stdout | default('0') | int }}"
       when: reboot_required_file is defined and reboot_required_file.stat is defined
-    
+
 - name: Notify Discord about update results
   hosts: localhost
   connection: local
   gather_facts: no
-  vars:
   tasks:
     - name: Build message content
       ansible.builtin.set_fact:
@@ -47,9 +51,10 @@
 
     - name: Send Discord notification
       ansible.builtin.uri:
-        url: "{{ webhook_url }}" #Variable in Variable Groupe in Semaphore einrichten und für den Task auswählen, damit keine Secrets im Playbook landen.
+        url: "{{ webhook_url }}"
         method: POST
         body_format: json
         body:
           content: "{{ discord_message }}"
         status_code: 204
+      check_mode: false
