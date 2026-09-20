@@ -10,6 +10,8 @@
       ansible.builtin.apt:
         update_cache: yes
         cache_valid_time: 0
+      environment:
+        DEBIAN_FRONTEND: noninteractive
 
     - name: Count upgradable APT packages before upgrade
       ansible.builtin.shell: apt list --upgradable 2>/dev/null | tail -n +2 | wc -l
@@ -20,6 +22,12 @@
       ansible.builtin.apt:
         upgrade: dist
       register: apt_upgrade_result
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+        NEEDRESTART_MODE: a
+        NEEDRESTART_SUSPEND: "1"
+      async: 1800
+      poll: 15
 
     - name: Check if reboot is required
       ansible.builtin.stat:
@@ -48,6 +56,18 @@
           **{{ host }}**: ⛔ nicht erreichbar
           {% endif %}
           {% endfor %}
+
+          {% set hosts_needing_reboot = [] %}
+          {% for host in groups['debian'] %}
+          {% if hostvars[host].needs_reboot is defined and hostvars[host].needs_reboot %}
+          {% set _ = hosts_needing_reboot.append(host) %}
+          {% endif %}
+          {% endfor %}
+          {% if hosts_needing_reboot | length > 0 %}
+          🔄 **Neustart erforderlich auf:** {{ hosts_needing_reboot | join(', ') }}
+          {% else %}
+          ✅ **Kein Host benötigt einen Neustart**
+          {% endif %}
 
     - name: Send Discord notification
       ansible.builtin.uri:
