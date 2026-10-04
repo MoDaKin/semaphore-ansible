@@ -10,6 +10,7 @@
       ansible.builtin.apt:
         update_cache: yes
         cache_valid_time: 0
+        lock_timeout: 120
       environment:
         DEBIAN_FRONTEND: noninteractive
 
@@ -21,12 +22,13 @@
     - name: Upgrade all packages
       ansible.builtin.apt:
         upgrade: dist
+        lock_timeout: 120
       register: apt_upgrade_result
       environment:
         DEBIAN_FRONTEND: noninteractive
         NEEDRESTART_MODE: a
         NEEDRESTART_SUSPEND: "1"
-      async: 1800
+      async: 900
       poll: 15
 
     - name: Check if reboot is required
