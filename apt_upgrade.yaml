@@ -1,6 +1,6 @@
 ---
 - name: Update packages and check reboot requirement
-  hosts: debian
+  hosts: debian:!Semaphore
   become: yes
   gather_facts: yes
   ignore_unreachable: true
@@ -51,7 +51,7 @@
       ansible.builtin.set_fact:
         discord_message: |
           📦 **Update-Report**
-          {% for host in groups['debian'] %}
+          {% for host in groups['debian'] | reject('equalto', 'Semaphore') %}
           {% if hostvars[host].needs_reboot is defined %}
           **{{ host }}**: {{ hostvars[host].updated_count | default(0) }} Pakete aktualisiert{{ ' ⚠️ Neustart empfohlen' if hostvars[host].needs_reboot else '' }}
           {% else %}
@@ -60,7 +60,7 @@
           {% endfor %}
 
           {% set hosts_needing_reboot = [] %}
-          {% for host in groups['debian'] %}
+          {% for host in groups['debian'] | reject('equalto', 'Semaphore') %}
           {% if hostvars[host].needs_reboot is defined and hostvars[host].needs_reboot %}
           {% set _ = hosts_needing_reboot.append(host) %}
           {% endif %}
